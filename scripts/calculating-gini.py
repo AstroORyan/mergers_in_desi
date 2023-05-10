@@ -8,8 +8,9 @@ Script to calculate the gini coefficients of all the mergers in my sample. This 
 ## Imports
 import numpy as np
 import pandas as pd
-import matoplotlib.pyplot as plt
+import matplotlib.pyplot as plt
 from tqdm import tqdm
+from zipfile import ZipFile
 tqdm.pandas()
 import os
 
@@ -22,7 +23,8 @@ from astropy.wcs import WCS
 from shapely.geometry import Polygon, Point
 import cv2 as cv
 
-from photutils import morphology
+import sys
+sys.path.insert(0, '/mmfs1/storage/users/oryan/torch-packages')
 
 ## Functions
 def getting_correct_contours(contours):
@@ -75,6 +77,17 @@ def get_galaxy(cutout):
     
     return reduced_cutout
 
+def calc_gini_func(pixels):
+    mean_flux = np.mean(abs(pixels))
+    ordered_pixels = np.sort(pixels)
+    n = len(ordered_pixels)
+    
+    gini = (((2 * np.arange(1, n + 1)) - n) - 1)*np.abs(ordered_pixels)
+        
+    normalization =  (mean_flux * n * (n - 1))
+    
+    return np.sum(gini) / normalization
+
 def calc_gini(path, petro_50, ra, dec): 
     if np.isnan(petro_50):
         return 'Failed'
@@ -96,20 +109,20 @@ def calc_gini(path, petro_50, ra, dec):
     
     reduced_cutout = get_galaxy(cutout)
     
-    gini = morphology.gini(reduced_cutout)
+    gini = calc_gini_func(reduced_cutout)
     
     return gini
     
 ## Main Function
 def main():
     print('Reading in CSV...')
-    df = pd.read_csv('/mmfs1/home/users/oryan/galaxy-zoo-desi/data/manifest-merger.csv', index_col = 0)
+    df = pd.read_csv('/mmfs1/home/users/oryan/galaxy-zoo-desi/data/mergers-hec-manifest.csv', index_col = 0)
     print('Successful.')
 
     print('Creating HEC Names...')
     df_hec = (
         df
-        .assign(hec_path = df.id_str.apply(lambda x: f'/mmfs1/storage/users/oryan/galaxy-zoo-desi/mergers/{x}-cutout.fits'))
+        .assign(hec_path = df.id_str.apply(lambda x: f'/mmfs1/scratch/hpc/60/oryan/desi-mergers/{x}-cutout.fits'))
     )
     print('Successful.')
 
@@ -118,16 +131,25 @@ def main():
     print('Beginning Gini Calculations...')
     df_gini = (
         df_hec.
-        assign(gini_r = df_hec.progress_apply(lambda row: calc_gini(row.hec_path, row.petro_50, row.ra, row.dec), axis = 1))
+        assign(gini_r = df_hec.progress_apply(lambda row: calc_gini(row.hec_path, row.est_petro_th50, row.ra, row.dec), axis = 1))
     )
     print('Completed.')
 
     print('Saving...')
-    df_gini.to_csv('/mmfs1/home/users/oryan/galaxy-zoo-desi/results/ginis-merger.csv')
+    df_gini.to_csv('/mmfs1/home/users/oryan/galaxy-zoo-desi/results/ginis-mergers.csv')
     print('Successfully saved.')
 
     print('Algorithm Completed.')
 
 ## Initialization
 if __name__ == '__main__':
+
+    zfile_path = '/mmfs1/scratch/hpc/60/oryan/mergers.zip'
+    if os.path.exists(zfile_path):
+        print('Extracting mergers...')
+        with ZipFile(zfile_path, 'r') as zfile:
+            zfile.extractall('/mmfs1/scratch/hpc/60/oryan/desi-mergers/')
+        print('Completed.')
+        os.remove(zfile_path)
+
     main()

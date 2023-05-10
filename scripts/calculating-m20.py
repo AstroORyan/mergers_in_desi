@@ -9,6 +9,7 @@ import glob
 import os
 from tqdm import tqdm
 tqdm.pandas()
+from zipfile import ZipFile
 
 from astropy.io import fits
 from astropy.wcs import WCS
@@ -200,27 +201,22 @@ def calc_m20(row):
 ## Main Function
 def main():
     print('Reading in CSV...')
-    df_ginis = pd.read_csv('/mmfs1/home/users/oryan/galaxy-zoo-desi/data/ginis-major.csv', index_col = 0)
+    df_ginis = pd.read_csv('/mmfs1/home/users/oryan/galaxy-zoo-desi/data/mergers-hec-manifest.csv', index_col = 0)
     print('Successful.')
 
     print('Creating HEC Names...')
     df_hec = (
         df_ginis
-        .assign(hec_path = df_ginis.id_str.apply(lambda x: f'/mmfs1/storage/users/oryan/galaxy-zoo-desi/major-cutouts/{x}-cutout.fits'))
+        .assign(hec_path = df_ginis.id_str.apply(lambda x: f'/mmfs1/scratch/hpc/60/oryan/desi-mergers/{x}-cutout.fits'))
     )
     print('Successful.')
 
     assert os.path.exists(df_hec.hec_path.iloc[0])
 
-    print('Removing invalid galaxies...')
-    df_part_rem = df_hec.query('gini != "partial-overlap"')
-    df_rem = df_part_rem.query('gini != "empty-image"')
-    print('Successful.')
-
     print('Beginning M20 Calculation...')
     df_m20 = (
-        df_rem
-        .assign(m20 = df_rem.progress_apply(lambda row: calc_m20(row), axis = 1))
+        df_hec
+        .assign(m20 = df_hec.progress_apply(lambda row: calc_m20(row), axis = 1))
     )
     print('Successful.')
 
@@ -232,4 +228,13 @@ def main():
 
 ## initialization
 if __name__ == '__main__':
+
+    zfile_path = '/mmfs1/scratch/hpc/60/oryan/mergers.zip'
+    if os.path.exists(zfile_path):
+        print('Extracting mergers...')
+        with ZipFile(zfile_path, 'r') as zfile:
+            zfile.extractall('/mmfs1/scratch/hpc/60/oryan/desi-mergers/')
+        print('Completed.')
+        os.remove(zfile_path)
+
     main()
