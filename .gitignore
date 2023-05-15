@@ -164,3 +164,8 @@ cython_debug/
 *.jpg
 *.png
 *.gif
+
+# Data
+*.csv
+*.fit
+*.fits
