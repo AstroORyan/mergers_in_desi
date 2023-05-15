@@ -87,13 +87,19 @@ def calc_m20(row):
     if np.isnan(petro_50):
          return 'Failed'
         
-
-    data = fits.getdata(path)
-    header = fits.getheader(path)
+    try:
+        data = fits.getdata(path)
+    except:
+        return 'corrupted'
+    
+    try:
+        header = fits.getheader(path)
+    except:
+        return 'corrupted'
 
     w = WCS(header, naxis = 2)
 
-    size = u.Quantity((4*petro_50, 4*petro_50), u.arcsec)
+    size = u.Quantity((10*petro_50, 10*petro_50), u.arcsec)
     coord = SkyCoord(ra = ra * u.deg, dec = dec * u.deg, frame = 'icrs')
     try:
         cutout = Cutout2D(data[1,:,:], coord, size, wcs = w, mode='strict')
@@ -105,7 +111,7 @@ def calc_m20(row):
 
     cutout_int = cutout.data.copy()
 
-    cut = np.percentile(cutout.data,65)
+    cut = np.percentile(cutout.data,90)
     cutout_int[cutout_int <= cut] = 0
     cutout_int[cutout_int > cut] = 1
     cutout_int = cutout_int.astype(int)
@@ -216,7 +222,7 @@ def main():
     print('Beginning M20 Calculation...')
     df_m20 = (
         df_hec
-        .assign(m20 = df_hec.progress_apply(lambda row: calc_m20(row), axis = 1))
+        .assign(m20 = df_hec.apply(lambda row: calc_m20(row), axis = 1))
     )
     print('Successful.')
 
