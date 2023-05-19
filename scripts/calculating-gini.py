@@ -45,9 +45,9 @@ def conts_to_list(contours):
     return contour_list
 
 def get_galaxy(cutout):
-    cutout_int = cutout.data.copy()
+    cutout_int = cutout.copy()
     
-    cut = np.percentile(cutout.data,90)
+    cut = np.percentile(cutout,90)
     cutout_int[cutout_int <= cut] = 0
     cutout_int[cutout_int > cut] = 1
     cutout_int = cutout_int.astype(int)
@@ -65,15 +65,15 @@ def get_galaxy(cutout):
         
     pl = Polygon(contour_arr)
     
-    pixels_mask = np.zeros(cutout.data.shape).astype(bool)
-    for i in range(cutout.data.shape[0]):
-        for j in range(cutout.data.shape[1]):
+    pixels_mask = np.zeros(cutout.shape).astype(bool)
+    for i in range(cutout.shape[0]):
+        for j in range(cutout.shape[1]):
             pt = Point(i,j)
             if pl.contains(pt):
                 pixels_mask[i,j] = True
     pixels_mask = pixels_mask.T
     
-    reduced_cutout = cutout.data[pixels_mask]
+    reduced_cutout = cutout[pixels_mask]
     
     return reduced_cutout
 
@@ -88,10 +88,7 @@ def calc_gini_func(pixels):
     
     return np.sum(gini) / normalization
 
-def calc_gini(path, petro_50, ra, dec): 
-    if np.isnan(petro_50):
-        return 'Failed'
-    
+def calc_gini(path, ra, dec):     
     try:
         data = fits.getdata(path)
     except:
@@ -101,17 +98,10 @@ def calc_gini(path, petro_50, ra, dec):
         header = fits.getheader(path)
     except:
         return 'corrupted'
+
+    cutout = data[1,:,:]
     
-    w = WCS(header, naxis = 2)
-    
-    size = u.Quantity((10*petro_50, 10*petro_50), u.arcsec)
-    coord = SkyCoord(ra = ra * u.deg, dec = dec * u.deg, frame = 'icrs')
-    try:
-        cutout = Cutout2D(data[1,:,:], coord, size, wcs = w, mode='strict')
-    except:
-        return 'partial-overlap'
-    
-    if np.sum(cutout.data) == 0:
+    if np.sum(cutout) == 0:
         return 'empty-image'
     
     reduced_cutout = get_galaxy(cutout)
@@ -138,7 +128,7 @@ def main():
     print('Beginning Gini Calculations...')
     df_gini = (
         df_hec.
-        assign(gini_r = df_hec.apply(lambda row: calc_gini(row.hec_path, row.est_petro_th50, row.ra, row.dec), axis = 1))
+        assign(gini_r = df_hec.apply(lambda row: calc_gini(row.hec_path, row.ra, row.dec), axis = 1))
     )
     print('Completed.')
 

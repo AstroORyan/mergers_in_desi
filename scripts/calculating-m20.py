@@ -45,9 +45,9 @@ def conts_to_list(contours):
     return contour_list
 
 def get_galaxy(cutout):
-    cutout_int = cutout.data.copy()
+    cutout_int = cutout.copy()
     
-    cut = np.percentile(cutout.data,65)
+    cut = np.percentile(cutout,90)
     cutout_int[cutout_int <= cut] = 0
     cutout_int[cutout_int > cut] = 1
     cutout_int = cutout_int.astype(int)
@@ -65,28 +65,24 @@ def get_galaxy(cutout):
         
     pl = Polygon(contour_arr)
     
-    pixels_mask = np.zeros(cutout.data.shape).astype(bool)
-    for i in range(cutout.data.shape[0]):
-        for j in range(cutout.data.shape[1]):
+    pixels_mask = np.zeros(cutout.shape).astype(bool)
+    for i in range(cutout.shape[0]):
+        for j in range(cutout.shape[1]):
             pt = Point(i,j)
             if pl.contains(pt):
                 pixels_mask[i,j] = True
     pixels_mask = pixels_mask.T
     
-    reduced_cutout = cutout.data[pixels_mask]
+    reduced_cutout = cutout[pixels_mask]
     
     return reduced_cutout
 
 def calc_m20(row):
     
     path = row.hec_path
-    petro_50 = row.est_petro_th50
     ra = row.ra
     dec = row.dec
-    
-    if np.isnan(petro_50):
-         return 'Failed'
-        
+
     try:
         data = fits.getdata(path)
     except:
@@ -96,22 +92,15 @@ def calc_m20(row):
         header = fits.getheader(path)
     except:
         return 'corrupted'
+    
+    cutout = data[1,:,:]
 
-    w = WCS(header, naxis = 2)
-
-    size = u.Quantity((10*petro_50, 10*petro_50), u.arcsec)
-    coord = SkyCoord(ra = ra * u.deg, dec = dec * u.deg, frame = 'icrs')
-    try:
-        cutout = Cutout2D(data[1,:,:], coord, size, wcs = w, mode='strict')
-    except:
-        return 'partial-overlap'
-
-    if np.sum(cutout.data) == 0:
+    if np.sum(cutout) == 0:
         return 'empty-image'
 
-    cutout_int = cutout.data.copy()
+    cutout_int = cutout.copy()
 
-    cut = np.percentile(cutout.data,90)
+    cut = np.percentile(cutout,90)
     cutout_int[cutout_int <= cut] = 0
     cutout_int[cutout_int > cut] = 1
     cutout_int = cutout_int.astype(int)
@@ -129,9 +118,9 @@ def calc_m20(row):
 
     pl = Polygon(contour_arr)
 
-    pixels_mask = np.zeros(cutout.data.shape).astype(bool)
-    for i in range(cutout.data.shape[0]):
-        for j in range(cutout.data.shape[1]):
+    pixels_mask = np.zeros(cutout.shape).astype(bool)
+    for i in range(cutout.shape[0]):
+        for j in range(cutout.shape[1]):
             pt = Point(i,j)
             if pl.contains(pt):
                 pixels_mask[i,j] = True
@@ -164,20 +153,20 @@ def calc_m20(row):
     mtot = np.inf
     for i in gal_pixels_list:
         
-        mtmp = np.sum(cutout.data[gal_pixels_arr[:,0], gal_pixels_arr[:,1]] * ((gal_pixels_arr[:,0] - i[0])**2 + (gal_pixels_arr[:,1] - i[1])**2))
+        mtmp = np.sum(cutout[gal_pixels_arr[:,0], gal_pixels_arr[:,1]] * ((gal_pixels_arr[:,0] - i[0])**2 + (gal_pixels_arr[:,1] - i[1])**2))
         
         if mtmp < mtot:
             mtot = mtmp.copy()
             center = i.copy()
 
-    f_tot = np.sum(cutout.data[pixels_mask])
+    f_tot = np.sum(cutout[pixels_mask])
     
     sum_f = 0
-    cutout_array = cutout.data.copy()
+    cutout_array = cutout.copy()
     pixels = []
 
     sum_f = 0
-    cutout_array = cutout.data.copy()
+    cutout_array = cutout.copy()
     cutout_array[np.invert(pixels_mask)] = 0
     pixels = []
 
@@ -196,7 +185,7 @@ def calc_m20(row):
     for i in pixels:
         x = i[0]
         y = i[1]
-        f = cutout.data[x,y]
+        f = cutout[x,y]
 
         m_i.append(f * ((x - center[0])**2 + (y - center[1])**2))
         
