@@ -27,15 +27,29 @@ import matplotlib.pyplot as plt
 import matplotlib
 
 ## Functions
-def getting_correct_contours(contours):
-    length = 0
-        
-    for i in contours:
-        if len(i) > length:
-            correct_contours = i
-            length = len(i)
+def conts_to_arr(nested_list):
+    contour_arr = np.zeros([len(nested_list),2])
+    for i in range(len(nested_list)):
+        row = nested_list[i][0]
+        contour_arr[i,0] = row[0]
+        contour_arr[i,1] = row[1]
     
-    return correct_contours
+    return contour_arr
+
+def getting_correct_contours(contours, cen_x, cen_y):
+    point = Point(cen_x, cen_y)        
+    for i in contours:
+        cont_arr = conts_to_arr(i)
+        if len(cont_arr) > 2:
+            polygon = Polygon(cont_arr)
+            if polygon.contains(point):
+                return cont_arr
+            else:
+                continue
+        else:
+            continue
+        
+    return 'failed'
 
 def conts_to_list(contours):
     contour_list = []
@@ -54,14 +68,10 @@ def get_galaxy(cutout):
     
     contours, _ = cv.findContours(cutout_int, cv.RETR_FLOODFILL, cv.CHAIN_APPROX_NONE)
     
-    contours_nested_list = getting_correct_contours(contours)
-    
-    extracted_contour_list = conts_to_list(contours_nested_list)
-    
-    contour_arr = np.zeros([len(extracted_contour_list),2])
-    for i in range(len(extracted_contour_list)):
-        contour_arr[i,0] = extracted_contour_list[i][0]
-        contour_arr[i,1] = extracted_contour_list[i][1]
+    contour_arr = getting_correct_contours(contours, int(cutout.shape[0]/2), int(cutout.shape[1]/2))
+
+    if contour_arr == "failed":
+        return 'no-galaxy'
         
     pl = Polygon(contour_arr)
     
@@ -100,21 +110,17 @@ def calc_m20(row):
 
     cutout_int = cutout.copy()
 
-    cut = np.percentile(cutout,90)
+    cut = np.percentile(cutout,80)
     cutout_int[cutout_int <= cut] = 0
     cutout_int[cutout_int > cut] = 1
     cutout_int = cutout_int.astype(int)
 
     contours, _ = cv.findContours(cutout_int, cv.RETR_FLOODFILL, cv.CHAIN_APPROX_NONE)
 
-    contours_nested_list = getting_correct_contours(contours)
+    contour_arr = getting_correct_contours(contours, int(cutout.shape[0]/2), int(cutout.shape[1]/2))
 
-    extracted_contour_list = conts_to_list(contours_nested_list)
-
-    contour_arr = np.zeros([len(extracted_contour_list),2])
-    for i in range(len(extracted_contour_list)):
-        contour_arr[i,0] = extracted_contour_list[i][0]
-        contour_arr[i,1] = extracted_contour_list[i][1]
+    if contour_arr == "failed":
+        return 'no-galaxy'
 
     pl = Polygon(contour_arr)
 
